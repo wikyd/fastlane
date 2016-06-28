@@ -1,6 +1,57 @@
 require 'pathname'
 require 'spaceship'
 
+
+module Spaceship
+  class PortalClient < Spaceship::Client
+
+    def create_certificate!(type, csr, app_id = nil)
+      ensure_csrf
+
+      puts "MONKEYS MONKEYS MONKEYS"
+      r = request(:post, 'account/mac/certificate/submitCertificateRequest.action', {
+        teamId: team_id,
+        type: type,
+        csrContent: csr,
+        appIdId: app_id # optional
+      })
+      parse_response(r, 'certRequest')
+    end
+
+  end
+
+  module Portal
+
+    class Certificate
+      class << self
+
+        def create!(csr: nil, bundle_id: nil)
+          type = CERTIFICATE_TYPE_IDS.key(self)
+
+          # look up the app_id by the bundle_id
+          if bundle_id
+            app = Spaceship::App.find(bundle_id, mac: true)
+            raise "Could not find app with bundle id '#{bundle_id}'" unless app
+            app_id = app.app_id
+          end
+
+          # ensure csr is a OpenSSL::X509::Request
+          csr = OpenSSL::X509::Request.new(csr) if csr.kind_of?(String)
+
+          # if this succeeds, we need to save the .cer and the private key in keychain access or wherever they go in linux
+          puts "BEFORE CREATE"
+          response = client.create_certificate!(type, csr.to_pem, app_id)
+          puts "AFTER CREATE"
+          # munge the response to make it work for the factory
+          response['certificateTypeDisplayId'] = response['certificateType']['certificateTypeDisplayId']
+          self.new(response)
+        end
+
+      end
+    end
+  end
+end
+
 module PEM
   # Creates the push profile and stores it in the correct location
   class Manager
@@ -84,9 +135,9 @@ module PEM
 
       def certificate
         if PEM.config[:development]
-          Spaceship.certificate.development_push
+          Spaceship.certificate.mac_development_push
         else
-          Spaceship.certificate.production_push
+          Spaceship.certificate.mac_production_push
         end
       end
     end

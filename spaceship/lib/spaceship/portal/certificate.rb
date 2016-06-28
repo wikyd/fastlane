@@ -286,7 +286,7 @@ module Spaceship
 
           # look up the app_id by the bundle_id
           if bundle_id
-            app = Spaceship::App.find(bundle_id)
+            app = Spaceship::App.find(bundle_id, mac: true)
             raise "Could not find app with bundle id '#{bundle_id}'" unless app
             app_id = app.app_id
           end
